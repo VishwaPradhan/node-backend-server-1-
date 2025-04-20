@@ -1,15 +1,15 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const http = require('http'); // 👈 for creating the server
-const { Server } = require('socket.io'); // 👈 Socket.IO
+const http = require('http');
+const { Server } = require('socket.io');
 
 const app = express();
-const server = http.createServer(app); // 👈 wrap Express app
+const server = http.createServer(app); // Create HTTP server
 const io = new Server(server, {
   cors: {
-    origin: '*', // adjust this for production
-    methods: ['GET', 'POST']
+    origin: "*", // Update this in production
+    methods: ["GET", "POST"]
   }
 });
 
@@ -24,7 +24,7 @@ app.get('/', (req, res) => {
   res.send('✅ Node.js + MongoDB backend is live!');
 });
 
-// MongoDB
+// MongoDB connection
 const mongoURI = 'mongodb+srv://ESP:KICK1234@cluster0.ft1i1q0.mongodb.net/esp-data?retryWrites=true&w=majority&appName=Cluster0';
 mongoose.connect(mongoURI, {
   useNewUrlParser: true,
@@ -33,18 +33,27 @@ mongoose.connect(mongoURI, {
 .then(() => console.log('✅ MongoDB connected'))
 .catch(err => console.error('❌ MongoDB connection error:', err));
 
-// Schema
+// Schema and model
 const forceSchema = new mongoose.Schema({
   force: Number,
   timestamp: { type: Date, default: Date.now }
 });
 const ForceData = mongoose.model('ForceData', forceSchema);
 
-// POST /force - receive new force from ESP32
+// WebSocket connection
+io.on('connection', (socket) => {
+  console.log('📡 Client connected');
+
+  socket.on('disconnect', () => {
+    console.log('❌ Client disconnected');
+  });
+});
+
+// POST endpoint - updated to emit via Socket.IO
 app.post('/force', async (req, res) => {
   console.log("📥 Received data from ESP32:", JSON.stringify(req.body));
-  const { force } = req.body;
 
+  const { force } = req.body;
   if (typeof force !== 'number' || force <= 0) {
     return res.status(400).json({ error: 'Invalid force value' });
   }
@@ -53,10 +62,10 @@ app.post('/force', async (req, res) => {
     const entry = new ForceData({ force });
     await entry.save();
 
-    // 🔥 Emit real-time update to all clients
-    io.emit('newForce', {
-      force: entry.force,
-      time: entry.timestamp.getTime()
+    // Emit the new data to all connected clients
+    io.emit('newForceData', {
+      time: entry.timestamp.getTime(),
+      force: entry.force
     });
 
     res.status(201).json({ message: 'Force data saved', data: entry });
@@ -66,7 +75,7 @@ app.post('/force', async (req, res) => {
   }
 });
 
-// GET /force - fetch existing force data
+// GET endpoint
 app.get('/force', async (req, res) => {
   try {
     const data = await ForceData.find().sort({ timestamp: -1 });
@@ -81,16 +90,7 @@ app.get('/force', async (req, res) => {
   }
 });
 
-// 🔌 WebSocket connection
-io.on('connection', (socket) => {
-  console.log('🟢 Client connected via Socket.IO');
-
-  socket.on('disconnect', () => {
-    console.log('🔴 Client disconnected');
-  });
-});
-
-// 🚀 Start the server
+// Start server with WebSocket support
 server.listen(PORT, () => {
-  console.log(`🚀 Server is running at http://localhost:${PORT}`);
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
