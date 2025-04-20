@@ -9,6 +9,11 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// Root route (🚀 added this part)
+app.get('/', (req, res) => {
+  res.send('✅ Node.js + MongoDB backend is live!');
+});
+
 // Hardcoded MongoDB Atlas URI
 const mongoURI = 'mongodb+srv://ESP:KICK1234@cluster0.ft1i1q0.mongodb.net/esp-data?retryWrites=true&w=majority&appName=Cluster0';
 mongoose.connect(mongoURI, {
